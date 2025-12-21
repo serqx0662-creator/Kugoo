@@ -1,35 +1,377 @@
-const mobileMenu = document.getElementById("mobileMenu");
-const mobileBottomMenu = document.getElementById("mobileBottomMenu");
-const burgerMenu = document.getElementById("burgerMain");
-
-burgerMenu.addEventListener('click', () => {
-    mobileMenu.classList.add("active");
-})
-
-document.getElementById("closeMobileMenu").onclick = () => {
-    mobileMenu.classList.remove("active");
-};
 
 
-const searchInput = document.querySelector(".search-input");
 
-searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        alert("Поиск: " + searchInput.value);
+document.addEventListener("DOMContentLoaded", () => {
+    const catalogBtn = document.querySelector('.catalog-btn');
+    const catalogDropdown = document.getElementById('catalogDropdown');
+
+    // Переключение меню
+    catalogBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        catalogDropdown.classList.toggle('active');
+
+        // Меняем иконку бургера на крестик в кнопке (опционально)
+        const icon = catalogBtn.querySelector('.catalog-icon');
+        icon.textContent = catalogDropdown.classList.contains('active') ? '✕' : '☰';
+    });
+
+    // Закрытие при клике вне меню
+    document.addEventListener('click', (e) => {
+        if (!catalogDropdown.contains(e.target) && !catalogBtn.contains(e.target)) {
+            catalogDropdown.classList.remove('active');
+            catalogBtn.querySelector('.catalog-icon').textContent = '☰';
+        }
+    });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const cartBtn = document.getElementById('cartBtn');
+    const cartDropdown = document.getElementById('cartDropdown');
+    const cartMobileClose = document.getElementById('cartMobileClose');
+    const cartItemsContainer = cartDropdown.querySelector('.cart-items');
+    const cartCountElement = cartDropdown.querySelector('.cart-count');
+    const totalSumElement = cartDropdown.querySelector('.total-sum');
+    const checkoutBtn = cartDropdown.querySelector('.checkout-btn');
+
+    // Загружаем корзину из localStorage
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+    // Создаем красный кружок-счетчик
+    const cartBadge = document.createElement('span');
+    cartBadge.className = 'cart-count-badge';
+    cartBadge.textContent = '0';
+    cartBtn.appendChild(cartBadge);
+
+    // Находим счетчик в мобильном меню
+    const mobileCartCount = document.getElementById('mobileCartCount') ||
+        document.querySelector('.mobile-cart-count');
+
+    // Функция обновления ВСЕХ счетчиков
+    function updateAllCounters() {
+        let totalCount = 0;
+        let totalSum = 0;
+
+        // Считаем общее количество товаров
+        cart.forEach(item => {
+            totalCount += item.quantity || 1;
+            totalSum += item.price * (item.quantity || 1);
+        });
+
+        // 1. Обновляем текст в корзине ("3 товара")
+        cartCountElement.textContent = `${totalCount} ${getNoun(totalCount, 'товар', 'товара', 'товаров')}`;
+
+        // 2. Обновляем сумму
+        totalSumElement.textContent = `${totalSum.toLocaleString()} ₽`;
+
+        // 3. Обновляем красный кружок на иконке корзины
+        cartBadge.textContent = totalCount;
+        cartBadge.style.display = totalCount > 0 ? 'flex' : 'none';
+
+        // 4. Обновляем счетчик в мобильном меню
+        if (mobileCartCount) {
+            mobileCartCount.textContent = totalCount;
+            mobileCartCount.style.display = totalCount > 0 ? 'flex' : 'none';
+        }
+
+        // Сохраняем в localStorage
+        localStorage.setItem('cart', JSON.stringify(cart));
     }
+
+    // Функция обновления отображения товаров в корзине
+    function updateCartDisplay() {
+        // Очищаем контейнер
+        cartItemsContainer.innerHTML = '';
+
+        if (cart.length === 0) {
+            // Создаем элемент для пустой корзины
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'cart-empty';
+            emptyDiv.textContent = 'Ваша корзина пока пуста';
+            cartItemsContainer.appendChild(emptyDiv);
+
+            // Блокируем кнопку оформления
+            if (checkoutBtn) {
+                checkoutBtn.disabled = true;
+                checkoutBtn.style.opacity = '0.6';
+                checkoutBtn.style.cursor = 'not-allowed';
+            }
+        } else {
+            cart.forEach((item, index) => {
+                const cartItem = document.createElement('div');
+                cartItem.className = 'cart-item';
+                cartItem.innerHTML = `
+                    <div class="item-img-wrapper">
+                        <img src="${item.image}" alt="${item.name}" class="item-img">
+                    </div>
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-price">
+                            ${item.price.toLocaleString()} ₽ 
+                            <span>× ${item.quantity || 1}</span>
+                        </div>
+                    </div>
+                    <button class="item-remove" data-index="${index}">×</button>
+                `;
+                cartItemsContainer.appendChild(cartItem);
+            });
+
+            // Активируем кнопку оформления
+            if (checkoutBtn) {
+                checkoutBtn.disabled = false;
+                checkoutBtn.style.opacity = '1';
+                checkoutBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // Обновляем все счетчики
+        updateAllCounters();
+    }
+
+    // Функция добавления товара в корзину
+    function addToCart(product) {
+        // Ищем товар в корзине
+        const existingIndex = cart.findIndex(item =>
+            item.id === product.id && item.name === product.name
+        );
+
+        if (existingIndex !== -1) {
+            // Увеличиваем количество
+            cart[existingIndex].quantity = (cart[existingIndex].quantity || 1) + 1;
+        } else {
+            // Добавляем новый товар
+            cart.push({
+                ...product,
+                quantity: 1
+            });
+        }
+
+        updateCartDisplay();
+        showCart();
+    }
+
+    // Функция показа корзины
+    function showCart() {
+        cartDropdown.classList.add('active');
+        // На мобильных блокируем скролл
+        if (window.innerWidth <= 768) {
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    // Функция скрытия корзины
+    function hideCart() {
+        cartDropdown.classList.remove('active');
+        // На мобильных восстанавливаем скролл
+        if (window.innerWidth <= 768) {
+            document.body.style.overflow = '';
+        }
+    }
+
+    // Обработчик клика по крестику
+    if (cartMobileClose) {
+        cartMobileClose.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hideCart();
+        });
+    }
+
+    // Обработчик клика по кнопке корзины
+    cartBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Проверяем, открыта ли корзина
+        const isOpen = cartDropdown.classList.contains('active');
+
+        if (isOpen) {
+            hideCart();
+        } else {
+            showCart();
+        }
+    });
+
+    // Закрытие корзины при клике вне её (только для десктопа)
+    document.addEventListener('click', (e) => {
+        // На десктопе (шире 768px) закрываем при клике вне
+        if (window.innerWidth > 768) {
+            const isClickInsideCart = cartDropdown.contains(e.target);
+            const isClickOnCartBtn = cartBtn.contains(e.target);
+
+            if (!isClickInsideCart && !isClickOnCartBtn) {
+                hideCart();
+            }
+        }
+    });
+
+    // Закрытие корзины по клавише Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && cartDropdown.classList.contains('active')) {
+            hideCart();
+        }
+    });
+
+    // Обработчик клика по кнопке удаления
+    cartItemsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('item-remove')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(e.target.dataset.index);
+            cart.splice(index, 1);
+            updateCartDisplay();
+        }
+    });
+
+    // Обработчик клика по кнопке "Купить в 1 клик"
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('js-buy-btn') ||
+            e.target.closest('.js-buy-btn')) {
+            e.preventDefault();
+
+            const btn = e.target.classList.contains('js-buy-btn') ?
+                e.target : e.target.closest('.js-buy-btn');
+            const productCard = btn.closest('.product-card');
+
+            const product = {
+                id: Date.now(),
+                name: productCard.querySelector('.product-name').textContent.trim(),
+                price: parseInt(productCard.querySelector('.new-price').dataset.price),
+                image: productCard.querySelector('.ps-item').src
+            };
+
+            addToCart(product);
+
+            // Анимация кнопки
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Добавлено';
+            btn.style.background = '#4CAF50';
+
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 2000);
+        }
+    });
+
+    // Функция для правильного склонения
+    function getNoun(number, one, two, five) {
+        let n = Math.abs(number);
+        n %= 100;
+        if (n >= 5 && n <= 20) return five;
+        n %= 10;
+        if (n === 1) return one;
+        if (n >= 2 && n <= 4) return two;
+        return five;
+    }
+
+    // Инициализация
+    updateCartDisplay();
 });
 
-const catalogBtn = document.querySelector(".catalog-btn");
+// Модальное окно заказа
+const orderModal = document.getElementById('orderModal');
+const orderModalClose = document.querySelector('.order-modal-close');
+const orderForm = document.getElementById('orderForm');
+const phoneInput = orderForm.querySelector('.form-input');
 
-catalogBtn.addEventListener("click", () => {
-    alert("Каталог открылся (тут будет выпадающее меню)");
+// Открытие модального окна при клике на "Оформить заказ" в корзине
+const checkoutBtn = document.querySelector('.checkout-btn');
+if (checkoutBtn) {
+    checkoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        orderModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+}
+
+// Закрытие модального окна
+orderModalClose.addEventListener('click', () => {
+    orderModal.classList.remove('active');
+    document.body.style.overflow = '';
 });
 
-const plusBtn = document.querySelector(".header-icon-plus");
-
-plusBtn.addEventListener("click", () => {
-    alert("Доп. меню (разделы)");
+// Закрытие при клике на оверлей
+document.querySelector('.order-modal-overlay').addEventListener('click', () => {
+    orderModal.classList.remove('active');
+    document.body.style.overflow = '';
 });
+
+// Маска для телефона
+phoneInput.addEventListener('input', function(e) {
+    let x = e.target.value.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})/);
+    e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '') + (x[4] ? '-' + x[4] : '');
+});
+
+// Отправка формы
+orderForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const phone = phoneInput.value.trim();
+
+    if (!phone || phone.length < 10) {
+        alert('Пожалуйста, введите корректный номер телефона');
+        return;
+    }
+
+    // Здесь отправка данных на сервер
+    console.log('Заказ оформлен:', {
+        phone: phone,
+        product: 'KUGOO KIRIN M4'
+    });
+
+    // Сообщение об успехе
+    alert('Спасибо за заказ! Наш менеджер свяжется с вами в течение 5 минут.');
+
+    // Закрываем модальное окно
+    orderModal.classList.remove('active');
+    document.body.style.overflow = '';
+
+    // Очищаем форму
+    orderForm.reset();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const phoneToggle = document.getElementById('phoneToggle');
+    const phoneDropdown = document.getElementById('phoneDropdown');
+
+    // Переключение видимости телефонов
+    phoneToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        phoneDropdown.classList.toggle('active');
+
+        // Поворот иконки
+        const img = this.querySelector('img');
+        if (phoneDropdown.classList.contains('active')) {
+            img.style.transform = 'rotate(45deg)';
+        } else {
+            img.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    // Закрытие при клике вне блока
+    document.addEventListener('click', function(e) {
+        if (!phoneDropdown.contains(e.target) && !phoneToggle.contains(e.target)) {
+            phoneDropdown.classList.remove('active');
+
+            // Возврат иконки в исходное положение
+            const img = phoneToggle.querySelector('img');
+            img.style.transform = 'rotate(0deg)';
+        }
+    });
+
+    // Закрытие при нажатии Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            phoneDropdown.classList.remove('active');
+            const img = phoneToggle.querySelector('img');
+            img.style.transform = 'rotate(0deg)';
+        }
+    });
+});
+
+
+
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -84,98 +426,181 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 4000);
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-    const burger = document.getElementById('burgerMain');
-    const mobileMenu = document.getElementById('mobileMenu');
-    const closeMenu = document.getElementById('closeMobileMenu');
-    const mobileInner = document.querySelector('.mobile-menu-inner');
-    const mobileNavContainer = document.getElementById('mobileNavLinks');
+// Бургер меню с анимациями
+const mobileMenu = document.getElementById("mobileMenu");
+const burgerMenu = document.getElementById("burgerMain");
+const closeMobileMenu = document.getElementById("closeMobileMenu");
 
-    if (!burger || !mobileMenu || !closeMenu || !mobileInner) {
-        console.warn('Mobile menu: required elements not found. Check IDs: burgerMain, mobileMenu, closeMobileMenu, .mobile-menu-inner');
-        return;
-    }
+// Открытие меню с анимацией
+burgerMenu.addEventListener('click', () => {
+    mobileMenu.classList.add("active");
+    document.body.style.overflow = 'hidden'; // Блокируем скролл
 
-    // 1) Копируем ссылки из desktop sub-nav (если есть)
-    const subNav = document.getElementById('subNav');
-    if (subNav && mobileNavContainer) {
-        // очистим на всякий случай
-        mobileNavContainer.innerHTML = '';
-        subNav.querySelectorAll('a').forEach(link => {
-            const clone = link.cloneNode(true);
-            // убираем лишние классы/стили, если нужно
-            clone.classList.remove('badge-blue');
-            // добавляем класс для мобильного меню
-            clone.classList.add('mobile-link-item');
-            mobileNavContainer.appendChild(clone);
-        });
-    }
+    // Анимация иконки бургера
+    burgerMenu.style.transform = 'rotate(90deg)';
+    burgerMenu.style.transition = 'transform 0.3s ease';
+});
 
-    // 2) Копируем поиск из desktop (.search-wrapper) внутрь mobileMenu (в начало, после крестика)
-    const desktopSearch = document.querySelector('.search-wrapper');
-    if (desktopSearch) {
-        // сделаем клон формы, но уберём события/атрибуты ненужные
-        const searchClone = desktopSearch.cloneNode(true);
-        // адаптируем классы
-        searchClone.classList.add('mobile-search-clone');
-        // вставляем под крестиком (в начало inner)
-        mobileInner.insertBefore(searchClone, mobileInner.children[1] || null);
-    } else {
-        // Если нет .search-wrapper — оставляем уже существующий мобильный поиск (если он есть)
-        // или можно создать пустой поисковый блок при желании.
-    }
+// Закрытие меню с анимацией
+closeMobileMenu.addEventListener('click', () => {
+    mobileMenu.classList.remove("active");
+    document.body.style.overflow = '';
 
-    // Функция открытия/закрытия + блокировка скролла
-    function openMenu() {
-        mobileMenu.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-    function closedMenu() {
-        mobileMenu.classList.remove('active');
+    // Возвращаем иконку бургера
+    burgerMenu.style.transform = 'rotate(0deg)';
+});
+
+// Закрытие при клике на оверлей
+mobileMenu.addEventListener('click', (e) => {
+    if (e.target === mobileMenu) {
+        mobileMenu.classList.remove("active");
         document.body.style.overflow = '';
+        burgerMenu.style.transform = 'rotate(0deg)';
     }
+});
 
-    // События
-    burger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openMenu();
-    });
+// Закрытие при нажатии Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mobileMenu.classList.contains('active')) {
+        mobileMenu.classList.remove("active");
+        document.body.style.overflow = '';
+        burgerMenu.style.transform = 'rotate(0deg)';
+    }
+});
 
-    closeMenu.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closedMenu();
-    });
+// Переключение телефонов в мобильном меню
+const mobilePhoneToggle = document.getElementById('mobilePhoneToggle');
+if (mobilePhoneToggle) {
+    mobilePhoneToggle.addEventListener('click', () => {
+        const contacts = document.querySelector('.mobile-contacts');
+        const plusBtn = mobilePhoneToggle;
 
-    // Закрываем по клику вне панели (по затемнению)
-    mobileMenu.addEventListener('click', (e) => {
-        if (e.target === mobileMenu) closedMenu();
-    });
-
-    // Закрываем по Esc
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closedMenu();
-    });
-
-    // Улучшение: делегируем клики по мобильным ссылкам чтобы меню закрывалось при навигации
-    mobileMenu.addEventListener('click', (e) => {
-        const a = e.target.closest('a');
-        if (!a) return;
-        const href = a.getAttribute('href') || '';
-        // если ссылка ведёт на якорь или внешний ресурс, закрываем меню
-        if (href.startsWith('#') || href.startsWith('/') || href.startsWith('http')) {
-            // небольшая задержка, чтобы переход произошёл после анимации
-            setTimeout(closedMenu, 150);
+        if (contacts.style.display === 'none' || !contacts.style.display) {
+            contacts.style.display = 'block';
+            plusBtn.textContent = '−';
+            plusBtn.style.transform = 'rotate(180deg)';
+        } else {
+            contacts.style.display = 'none';
+            plusBtn.textContent = '+';
+            plusBtn.style.transform = 'rotate(0deg)';
         }
     });
+}
 
-    if (!mobileNavContainer || mobileNavContainer.children.length === 0) {
+// Синхронизация счетчика корзины
+function updateMobileCartCount(count) {
+    const mobileCartCount = document.getElementById('mobileCartCount');
+    if (mobileCartCount) {
+        mobileCartCount.textContent = count;
+
+        // Анимация обновления счетчика
+        mobileCartCount.style.transform = 'scale(1.3)';
+        setTimeout(() => {
+            mobileCartCount.style.transform = 'scale(1)';
+        }, 300);
     }
+}
 
-    mobileMenu.addEventListener('transitionend', () => {
-        const input = mobileMenu.querySelector('input[type="text"], .search-input');
-        if (input && mobileMenu.classList.contains('active')) {
-            input.focus({ preventScroll: true });
+// Открытие корзины из мобильного меню
+const mobileCartBtn = document.getElementById('mobileCartBtn');
+if (mobileCartBtn) {
+    mobileCartBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+
+        // Закрываем меню
+        mobileMenu.classList.remove("active");
+        document.body.style.overflow = '';
+        burgerMenu.style.transform = 'rotate(0deg)';
+
+        // Открываем корзину
+        setTimeout(() => {
+            document.getElementById('cartBtn').click();
+        }, 300);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    document.querySelectorAll('.product-slider').forEach(slider => {
+        const track = slider.querySelector('.ps-track');
+        const items = slider.querySelectorAll('.ps-item');
+        const prev = slider.querySelector('.ps-prev');
+        const next = slider.querySelector('.ps-next');
+
+        if (!track || !items.length) return;
+
+        let index = 0;
+
+        function update() {
+            track.style.transform = `translateX(-${index * 100}%)`;
         }
+
+        prev?.addEventListener('click', () => {
+            index = (index - 1 + items.length) % items.length;
+            update();
+        });
+
+        next?.addEventListener('click', () => {
+            index = (index + 1) % items.length;
+            update();
+        });
+
+        // свайп
+        let startX = 0;
+        slider.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+        });
+
+        slider.addEventListener('touchend', e => {
+            const diff = startX - e.changedTouches[0].clientX;
+            if (diff > 50) next.click();
+            if (diff < -50) prev.click();
+        });
+    });
+
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    const buttons = document.querySelectorAll('.filter-btn');
+    const cards = document.querySelectorAll('.product-card');
+
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+
+            // активная кнопка
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const filter = btn.dataset.filter;
+
+            cards.forEach(card => {
+                const categories = card.dataset.category.split(' ');
+
+                if (filter === 'all' || categories.includes(filter)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+
+        });
+    });
+
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.querySelector('.catalog-more');
+    const extra = document.querySelector('.extra-products');
+
+    if (!btn || !extra) return;
+
+    btn.addEventListener('click', () => {
+        extra.classList.toggle('open');
+
+        btn.textContent = extra.classList.contains('open')
+            ? 'Свернуть'
+            : 'Смотреть все';
     });
 });
 
@@ -199,6 +624,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('showMoreBtn');
+    const extraGrid = document.getElementById('extraGrid');
+
+    if (btn && extraGrid) {
+        btn.addEventListener('click', function() {
+            // Переключаем класс видимости (если есть — уберет, если нет — добавит)
+            const isVisible = extraGrid.classList.toggle('is-visible');
+
+            // Меняем текст кнопки в зависимости от состояния
+            if (isVisible) {
+                btn.textContent = 'Свернуть';
+            } else {
+                btn.textContent = 'Смотреть все';
+
+                // Опционально: плавно скроллим вверх к началу секции при сворачивании
+                extraGrid.closest('.popular-categories').scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -453,3 +900,119 @@ document.querySelectorAll('.faq-question').forEach(button => {
         }
     });
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    const subscribeForm = document.querySelector('.subscribe-form'); // Найди свою форму
+    const modal = document.getElementById('successModal');
+    const closeBtn = document.querySelector('.modal-close');
+
+    if (subscribeForm) {
+        subscribeForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Отменяем перезагрузку страницы
+
+            // Здесь можно добавить проверку, ввел ли пользователь email
+            const emailInput = subscribeForm.querySelector('input[type="email"]');
+            if (emailInput && emailInput.value.trim() !== "") {
+                modal.classList.add('active'); // Показываем модалку
+                subscribeForm.reset(); // Очищаем поле ввода
+            }
+        });
+    }
+
+    // Закрытие при клике на крестик
+    closeBtn.addEventListener('click', function() {
+        modal.classList.remove('active');
+    });
+
+    // Закрытие при клике вне контента (на темный фон)
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+});
+
+// ===== CALLBACK POPUP =====
+const callbackPopup = document.getElementById('callbackPopup');
+const callbackCloseBtn = document.getElementById('callbackPopupClose');
+const callbackForm = document.querySelector('.callback-form');
+const callbackPhoneInput = document.querySelector('.callback-phone-input');
+const callbackOpenBtn = document.querySelector('.callback-link'); // "Заказать звонок"
+
+// Открытие модалки
+if (callbackOpenBtn) {
+    callbackOpenBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        callbackPopup.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+}
+
+// Закрытие по крестику
+callbackCloseBtn.addEventListener('click', () => {
+    callbackPopup.classList.remove('active');
+    document.body.style.overflow = '';
+});
+
+// Закрытие по клику вне окна
+callbackPopup.addEventListener('click', (e) => {
+    if (e.target === callbackPopup) {
+        callbackPopup.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+
+// Маска телефона
+callbackPhoneInput.addEventListener('input', function (e) {
+    let x = e.target.value
+        .replace(/\D/g, '')
+        .match(/(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})/);
+
+    e.target.value = !x[2]
+        ? x[1]
+        : '(' + x[1] + ') ' + x[2]
+        + (x[3] ? '-' + x[3] : '')
+        + (x[4] ? '-' + x[4] : '');
+});
+
+// Выбор соцсети
+const socialButtons = document.querySelectorAll('.callback-social-item');
+let selectedSocial = 'phone';
+
+socialButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        socialButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (btn.classList.contains('viber')) selectedSocial = 'viber';
+        if (btn.classList.contains('whatsapp')) selectedSocial = 'whatsapp';
+        if (btn.classList.contains('telegram')) selectedSocial = 'telegram';
+    });
+});
+
+// Отправка формы
+callbackForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const phone = callbackPhoneInput.value.trim();
+
+    if (!phone || phone.length < 10) {
+        alert('Введите корректный номер телефона');
+        return;
+    }
+
+    console.log('Заявка на звонок:', {
+        phone: phone,
+        contact_method: selectedSocial
+    });
+
+    alert('Спасибо! Мы свяжемся с вами в течение 5 минут.');
+
+    callbackPopup.classList.remove('active');
+    document.body.style.overflow = '';
+    callbackForm.reset();
+
+    socialButtons.forEach(b => b.classList.remove('active'));
+    selectedSocial = 'phone';
+});
+
